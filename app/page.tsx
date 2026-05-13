@@ -52,18 +52,7 @@ export default function Home() {
 
       <div className="flex gap-2 mb-2">
         <label className="flex-1 cursor-pointer bg-blue-500 hover:bg-blue-600 text-white text-center py-3 rounded-lg">
-          {loading ? '処理中...' : '📷 撮影'}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleUpload}
-            disabled={loading}
-          />
-        </label>
-        <label className="flex-1 cursor-pointer bg-gray-500 hover:bg-gray-600 text-white text-center py-3 rounded-lg">
-          {loading ? '処理中...' : '🖼️ アップロード'}
+          {loading ? '処理中...' : '📷 撮影 / アップロード'}
           <input
             type="file"
             accept="image/*"
