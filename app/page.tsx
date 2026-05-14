@@ -49,6 +49,28 @@ export default function Home() {
     setReceipts((prev) => prev.filter((r) => r.id !== id))
   }
 
+  function handleDownloadCSV() {
+    const header = ['日付', '店名', '金額', '勘定科目']
+    const rows = receipts.map((r) => [
+      r.receipt_date ?? '',
+      r.store_name ?? '',
+      r.amount != null ? String(r.amount) : '',
+      r.category ?? '',
+    ])
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+
+    const bom = '﻿'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `経費精算_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const total = receipts.reduce((sum, r) => sum + (r.amount ?? 0), 0)
 
   return (
@@ -66,6 +88,13 @@ export default function Home() {
             disabled={loading}
           />
         </label>
+        <button
+          onClick={handleDownloadCSV}
+          disabled={receipts.length === 0}
+          className="px-4 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium"
+        >
+          CSV出力
+        </button>
       </div>
 
       {message && <p className="text-sm text-center text-gray-600 mb-4">{message}</p>}
