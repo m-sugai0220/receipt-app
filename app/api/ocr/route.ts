@@ -63,28 +63,33 @@ function extractReceiptInfo(text: string): {
 
 function extractAmount(text: string): number | null {
   const parse = (s: string) => parseInt(s.replace(/,/g, ''), 10)
-  // ¥・￥・OCRが¥を\と読むケースをまとめて通貨記号として扱う
   const currency = '[¥￥\\\\]'
 
-  // 1. 合計・お会計・TOTAL（最終金額キーワード）
-  const totalMatch = text.match(new RegExp(`(合\\s*計|お会計|TOTAL|Total)[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
+  // お預かり・お釣り・おつりの行は除外（領収金額ではないため）
+  const filtered = text
+    .split('\n')
+    .filter((l) => !/お?預り?金?|お預かり|おつり|お釣り|釣り銭|チェンジ|CHANGE|CASH|キャッシュ/.test(l))
+    .join('\n')
+
+  // 1. 合計・お会計・TOTAL・領収金額（最終金額キーワード）
+  const totalMatch = filtered.match(new RegExp(`(領収金額|合\\s*計|お会計|TOTAL|Total)[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
   if (totalMatch) return parse(totalMatch[2])
 
   // 2. 通行料金（高速道路・交通系領収書）
-  const tollMatch = text.match(new RegExp(`通行料金[^\\d¥￥\\\\\\n]{0,15}${currency}\\s*(\\d[\\d,]+)`))
+  const tollMatch = filtered.match(new RegExp(`通行料金[^\\d¥￥\\\\\\n]{0,15}${currency}\\s*(\\d[\\d,]+)`))
   if (tollMatch) return parse(tollMatch[1])
 
   // 3. 税込合計
-  const taxTotalMatch = text.match(new RegExp(`税込[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
+  const taxTotalMatch = filtered.match(new RegExp(`税込[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
   if (taxTotalMatch) return parse(taxTotalMatch[1])
 
-  // 4. 通貨記号付きの金額の最大値（電話番号などは通貨記号がないので安全）
-  const yenMatches = [...text.matchAll(new RegExp(`${currency}\\s*(\\d[\\d,]+)`, 'g'))]
+  // 4. 通貨記号付きの金額の最大値（預り金除外済みテキストから）
+  const yenMatches = [...filtered.matchAll(new RegExp(`${currency}\\s*(\\d[\\d,]+)`, 'g'))]
   if (yenMatches.length > 0)
     return Math.max(...yenMatches.map((m) => parse(m[1])))
 
   // 5. 小計（最終手段）
-  const subtotalMatch = text.match(new RegExp(`小\\s*計[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
+  const subtotalMatch = filtered.match(new RegExp(`小\\s*計[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
   if (subtotalMatch) return parse(subtotalMatch[1])
 
   return null
