@@ -54,7 +54,8 @@ function extractReceiptInfo(text: string): {
 } {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
 
-  const store_name = lines[0] ?? null
+  const skipPattern = /ありがとう|領収書|レシート|証明書|料金所|停車|ください|TEL|tel|〒|\d{3}-\d{4}/
+  const store_name = lines.find((l) => l.length >= 2 && !skipPattern.test(l)) ?? null
 
   const amount = extractAmount(text)
   return { store_name, amount, receipt_date: extractDate(text) }
