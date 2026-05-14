@@ -61,30 +61,43 @@ function extractReceiptInfo(text: string): {
 
 function extractAmount(text: string): number | null {
   const parse = (s: string) => parseInt(s.replace(/,/g, ''), 10)
+  // ¥・￥・OCRが¥を\と読むケースをまとめて通貨記号として扱う
+  const currency = '[¥￥\\\\]'
 
-  // 1. 合計・お会計・TOTAL を最優先（小計・税込より後に出る最終金額）
-  const totalMatch = text.match(/(合\s*計|お会計|TOTAL|Total)[^\d¥￥\n]{0,15}[¥￥]?\s*(\d[\d,]+)/)
+  // 1. 合計・お会計・TOTAL（最終金額キーワード）
+  const totalMatch = text.match(new RegExp(`(合\\s*計|お会計|TOTAL|Total)[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
   if (totalMatch) return parse(totalMatch[2])
 
-  // 2. 税込合計
-  const taxTotalMatch = text.match(/税込[^\d¥￥\n]{0,15}[¥￥]?\s*(\d[\d,]+)/)
+  // 2. 通行料金（高速道路・交通系領収書）
+  const tollMatch = text.match(new RegExp(`通行料金[^\\d¥￥\\\\\\n]{0,15}${currency}\\s*(\\d[\\d,]+)`))
+  if (tollMatch) return parse(tollMatch[1])
+
+  // 3. 税込合計
+  const taxTotalMatch = text.match(new RegExp(`税込[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
   if (taxTotalMatch) return parse(taxTotalMatch[1])
 
-  // 3. ¥/￥ 付きの金額がある場合は最大値（明細の最大 = 合計に近い）
-  const yenMatches = [...text.matchAll(/[¥￥]\s*(\d[\d,]+)/g)]
+  // 4. 通貨記号付きの金額の最大値（電話番号などは通貨記号がないので安全）
+  const yenMatches = [...text.matchAll(new RegExp(`${currency}\\s*(\\d[\\d,]+)`, 'g'))]
   if (yenMatches.length > 0)
     return Math.max(...yenMatches.map((m) => parse(m[1])))
 
-  // 4. 小計（最終手段）
-  const subtotalMatch = text.match(/小\s*計[^\d¥￥\n]{0,15}[¥￥]?\s*(\d[\d,]+)/)
+  // 5. 小計（最終手段）
+  const subtotalMatch = text.match(new RegExp(`小\\s*計[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
   if (subtotalMatch) return parse(subtotalMatch[1])
 
   return null
 }
 
 function extractDate(text: string): string | null {
-  // 西暦: 2026年5月13日 / 2026/5/13 / 2026-5-13 / 2026. 5.13（スペース混入含む）
-  const westernMatch = text.match(/(\d{4})\s*[年\/\-\.]\s*(\d{1,2})\s*[月\/\-\.]\s*(\d{1,2})/)
+  // 年月日形式（2桁・4桁の西暦、スペース混入含む）: 26年4月27日 / 2026年5月13日
+  const nenMatch = text.match(/(\d{2,4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})/)
+  if (nenMatch) {
+    const y = parseInt(nenMatch[1], 10)
+    const year = y < 100 ? 2000 + y : y
+    return `${year}-${nenMatch[2].padStart(2, '0')}-${nenMatch[3].padStart(2, '0')}`
+  }
+  // スラッシュ・ハイフン・ドット区切り: 2026/5/13 / 2026-5-13 / 2026.5.13
+  const westernMatch = text.match(/(\d{4})\s*[\/\-\.]\s*(\d{1,2})\s*[\/\-\.]\s*(\d{1,2})/)
   if (westernMatch) {
     return `${westernMatch[1]}-${westernMatch[2].padStart(2, '0')}-${westernMatch[3].padStart(2, '0')}`
   }
