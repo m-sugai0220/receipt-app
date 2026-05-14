@@ -7,7 +7,6 @@ export default function Home() {
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [debugText, setDebugText] = useState('')
 
   useEffect(() => {
     fetchReceipts()
@@ -38,12 +37,16 @@ export default function Home() {
       setMessage(`エラー: ${json.error}`)
     } else {
       setMessage('保存しました！')
-      setDebugText(json.raw_text ?? '')
       fetchReceipts()
     }
 
     setLoading(false)
     e.target.value = ''
+  }
+
+  async function handleDelete(id: string) {
+    await supabase.from('receipts').delete().eq('id', id)
+    setReceipts((prev) => prev.filter((r) => r.id !== id))
   }
 
   const total = receipts.reduce((sum, r) => sum + (r.amount ?? 0), 0)
@@ -65,12 +68,7 @@ export default function Home() {
         </label>
       </div>
 
-      {message && <p className="text-sm text-center text-gray-600 mb-2">{message}</p>}
-      {debugText && (
-        <pre className="text-xs bg-yellow-50 border border-yellow-300 rounded p-2 mb-4 whitespace-pre-wrap break-all">
-          {debugText}
-        </pre>
-      )}
+      {message && <p className="text-sm text-center text-gray-600 mb-4">{message}</p>}
 
       <div className="bg-gray-100 rounded-lg p-3 mb-4 text-right">
         <span className="text-sm text-gray-500">合計金額</span>
@@ -85,9 +83,18 @@ export default function Home() {
                 <p className="font-semibold">{r.store_name ?? '店名不明'}</p>
                 <p className="text-sm text-gray-500">{r.receipt_date ?? '日付不明'}</p>
               </div>
-              <p className="text-lg font-bold text-blue-600">
-                {r.amount != null ? `¥${r.amount.toLocaleString()}` : '金額不明'}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-lg font-bold text-blue-600">
+                  {r.amount != null ? `¥${r.amount.toLocaleString()}` : '金額不明'}
+                </p>
+                <button
+                  onClick={() => handleDelete(r.id)}
+                  className="text-gray-300 hover:text-red-500 transition-colors text-xl leading-none"
+                  aria-label="削除"
+                >
+                  ×
+                </button>
+              </div>
             </div>
           </div>
         ))}
