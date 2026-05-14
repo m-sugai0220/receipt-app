@@ -3,25 +3,25 @@
 import { useState, useEffect } from 'react'
 import { supabase, Receipt } from '@/lib/supabase'
 
-const CATEGORY_COLORS: Record<string, string> = {
-  旅費交通費: 'bg-blue-100 text-blue-700',
-  車両費: 'bg-cyan-100 text-cyan-700',
-  接待交際費: 'bg-orange-100 text-orange-700',
-  会議費: 'bg-yellow-100 text-yellow-700',
-  消耗品費: 'bg-green-100 text-green-700',
-  通信費: 'bg-purple-100 text-purple-700',
-  研修費: 'bg-teal-100 text-teal-700',
-  新聞図書費: 'bg-lime-100 text-lime-700',
-  広告宣伝費: 'bg-pink-100 text-pink-700',
-  外注費: 'bg-indigo-100 text-indigo-700',
-  支払手数料: 'bg-gray-100 text-gray-600',
-  租税公課: 'bg-red-100 text-red-700',
-  地代家賃: 'bg-amber-100 text-amber-700',
-  未分類: 'bg-gray-100 text-gray-400',
+const CATEGORY_DOT: Record<string, string> = {
+  旅費交通費: 'bg-sky-400',
+  車両費: 'bg-cyan-400',
+  接待交際費: 'bg-amber-400',
+  会議費: 'bg-yellow-400',
+  消耗品費: 'bg-emerald-400',
+  通信費: 'bg-violet-400',
+  研修費: 'bg-teal-400',
+  新聞図書費: 'bg-lime-400',
+  広告宣伝費: 'bg-rose-400',
+  外注費: 'bg-indigo-400',
+  支払手数料: 'bg-slate-400',
+  租税公課: 'bg-red-400',
+  地代家賃: 'bg-orange-400',
+  未分類: 'bg-slate-600',
 }
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '日付不明'
+  if (!dateStr) return '—'
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return dateStr
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
@@ -60,7 +60,7 @@ export default function Home() {
     if (json.error) {
       setMessage(`エラー: ${json.error}`)
     } else {
-      setMessage('保存しました！')
+      setMessage('保存しました')
       fetchReceipts()
     }
 
@@ -85,8 +85,7 @@ export default function Home() {
       .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
       .join('\n')
 
-    const bom = '﻿'
-    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -98,86 +97,103 @@ export default function Home() {
   const total = receipts.reduce((sum, r) => sum + (r.amount ?? 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d0d12] text-white">
+
       {/* ヘッダー */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-600 text-white px-5 pt-10 pb-16">
-        <p className="text-sm text-slate-400 mb-1">経費管理</p>
-        <h1 className="text-2xl font-bold mb-6">領収書管理</h1>
-        <div className="bg-white/10 rounded-2xl p-4 backdrop-blur">
-          <p className="text-slate-300 text-sm mb-1">今月の合計</p>
-          <p className="text-4xl font-bold tracking-tight">¥{total.toLocaleString()}</p>
-          <p className="text-slate-400 text-xs mt-1">{receipts.length}件</p>
+      <div className="relative px-5 pt-12 pb-20 overflow-hidden">
+        {/* 背景の光彩 */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Expense Tracker</p>
+        <h1 className="text-2xl font-semibold text-white mb-8">領収書管理</h1>
+
+        {/* 合計カード */}
+        <div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+          <p className="text-xs text-slate-400 tracking-wide mb-2">今月の合計経費</p>
+          <p className="text-5xl font-bold text-amber-400 tracking-tight">
+            ¥{total.toLocaleString()}
+          </p>
+          <p className="text-xs text-slate-500 mt-2">{receipts.length} 件</p>
+          {/* 右下装飾 */}
+          <div className="absolute bottom-4 right-5 text-slate-700 text-6xl font-black select-none leading-none">
+            ¥
+          </div>
         </div>
       </div>
 
-      {/* メインコンテンツ */}
-      <div className="px-4 -mt-6">
-        {/* アクションボタン */}
-        <div className="flex gap-3 mb-5">
-          <label className="flex-1 cursor-pointer bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-center py-3.5 rounded-xl font-semibold shadow-lg shadow-blue-200 transition-colors">
+      {/* アクションボタン */}
+      <div className="px-4 -mt-6 flex gap-3 mb-6">
+        <label className="flex-1 cursor-pointer relative group">
+          <div className="absolute inset-0 bg-amber-400 rounded-xl blur opacity-30 group-hover:opacity-50 transition-opacity" />
+          <div className="relative bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-black font-semibold text-center py-4 rounded-xl transition-colors">
             {loading ? '読み取り中...' : '📷  撮影 / アップロード'}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={loading}
-            />
-          </label>
-          <button
-            onClick={handleDownloadCSV}
-            disabled={receipts.length === 0}
-            className="px-4 py-3.5 bg-white hover:bg-gray-50 disabled:opacity-40 text-slate-700 rounded-xl font-semibold shadow border border-gray-200 transition-colors text-sm"
-          >
-            CSV
-          </button>
-        </div>
-
-        {message && (
-          <div className="mb-4 px-4 py-2.5 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl text-center">
-            {message}
           </div>
-        )}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUpload}
+            disabled={loading}
+          />
+        </label>
+        <button
+          onClick={handleDownloadCSV}
+          disabled={receipts.length === 0}
+          className="px-5 py-4 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-30 text-slate-300 font-medium text-sm transition-colors"
+        >
+          CSV
+        </button>
+      </div>
 
-        {/* レシート一覧 */}
-        <div className="space-y-3 pb-8">
-          {receipts.map((r) => {
-            const badgeClass = CATEGORY_COLORS[r.category ?? ''] ?? CATEGORY_COLORS['未分類']
-            return (
-              <div key={r.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-                <div className="flex justify-between items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-800 truncate">
-                      {r.store_name ?? '店名不明'}
-                    </p>
-                    <p className="text-sm text-slate-400 mt-0.5">{formatDate(r.receipt_date)}</p>
-                    <span className={`inline-block mt-2 text-xs font-medium px-2.5 py-0.5 rounded-full ${badgeClass}`}>
-                      {r.category ?? '未分類'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <p className="text-xl font-bold text-slate-800">
-                      {r.amount != null ? `¥${r.amount.toLocaleString()}` : '—'}
-                    </p>
-                    <button
-                      onClick={() => handleDelete(r.id)}
-                      className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-full transition-colors text-lg"
-                      aria-label="削除"
-                    >
-                      ×
-                    </button>
+      {message && (
+        <div className="mx-4 mb-4 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm text-center">
+          {message}
+        </div>
+      )}
+
+      {/* レシート一覧 */}
+      <div className="px-4 space-y-3 pb-12">
+        {receipts.map((r) => {
+          const dot = CATEGORY_DOT[r.category ?? ''] ?? CATEGORY_DOT['未分類']
+          return (
+            <div
+              key={r.id}
+              className="rounded-2xl border border-white/8 bg-white/4 backdrop-blur p-4 hover:bg-white/7 transition-colors"
+            >
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white truncate leading-tight">
+                    {r.store_name ?? '店名不明'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">{formatDate(r.receipt_date)}</p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
+                    <span className="text-xs text-slate-400">{r.category ?? '未分類'}</span>
                   </div>
                 </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <p className="text-xl font-bold text-amber-400">
+                    {r.amount != null ? `¥${r.amount.toLocaleString()}` : '—'}
+                  </p>
+                  <button
+                    onClick={() => handleDelete(r.id)}
+                    className="w-7 h-7 flex items-center justify-center rounded-full text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors text-lg"
+                    aria-label="削除"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-            )
-          })}
-          {receipts.length === 0 && (
-            <div className="text-center py-16 text-slate-400">
-              <p className="text-4xl mb-3">🧾</p>
-              <p className="text-sm">レシートがまだありません</p>
             </div>
-          )}
-        </div>
+          )
+        })}
+
+        {receipts.length === 0 && (
+          <div className="text-center py-20 text-slate-600">
+            <p className="text-5xl mb-4">🧾</p>
+            <p className="text-sm">レシートがまだありません</p>
+          </div>
+        )}
       </div>
     </div>
   )
