@@ -3,21 +3,21 @@
 import { useState, useEffect } from 'react'
 import { supabase, Receipt } from '@/lib/supabase'
 
-const CATEGORY_DOT: Record<string, string> = {
-  旅費交通費: 'bg-sky-400',
-  車両費: 'bg-cyan-400',
-  接待交際費: 'bg-amber-400',
-  会議費: 'bg-yellow-400',
-  消耗品費: 'bg-emerald-400',
-  通信費: 'bg-violet-400',
-  研修費: 'bg-teal-400',
-  新聞図書費: 'bg-lime-400',
-  広告宣伝費: 'bg-rose-400',
-  外注費: 'bg-indigo-400',
-  支払手数料: 'bg-slate-400',
-  租税公課: 'bg-red-400',
-  地代家賃: 'bg-orange-400',
-  未分類: 'bg-slate-600',
+const CATEGORY_COLOR: Record<string, { dot: string; pill: string }> = {
+  旅費交通費:  { dot: 'bg-blue-400',   pill: 'bg-blue-50 text-blue-600 border-blue-100' },
+  車両費:      { dot: 'bg-cyan-400',   pill: 'bg-cyan-50 text-cyan-600 border-cyan-100' },
+  接待交際費:  { dot: 'bg-orange-400', pill: 'bg-orange-50 text-orange-600 border-orange-100' },
+  会議費:      { dot: 'bg-yellow-400', pill: 'bg-yellow-50 text-yellow-700 border-yellow-100' },
+  消耗品費:    { dot: 'bg-emerald-400',pill: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+  通信費:      { dot: 'bg-violet-400', pill: 'bg-violet-50 text-violet-600 border-violet-100' },
+  研修費:      { dot: 'bg-teal-400',   pill: 'bg-teal-50 text-teal-600 border-teal-100' },
+  新聞図書費:  { dot: 'bg-lime-500',   pill: 'bg-lime-50 text-lime-700 border-lime-100' },
+  広告宣伝費:  { dot: 'bg-rose-400',   pill: 'bg-rose-50 text-rose-600 border-rose-100' },
+  外注費:      { dot: 'bg-indigo-400', pill: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+  支払手数料:  { dot: 'bg-slate-400',  pill: 'bg-slate-50 text-slate-500 border-slate-100' },
+  租税公課:    { dot: 'bg-red-400',    pill: 'bg-red-50 text-red-600 border-red-100' },
+  地代家賃:    { dot: 'bg-amber-400',  pill: 'bg-amber-50 text-amber-600 border-amber-100' },
+  未分類:      { dot: 'bg-gray-300',   pill: 'bg-gray-50 text-gray-400 border-gray-100' },
 }
 
 function formatDate(dateStr: string | null): string {
@@ -32,9 +32,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  useEffect(() => {
-    fetchReceipts()
-  }, [])
+  useEffect(() => { fetchReceipts() }, [])
 
   async function fetchReceipts() {
     const { data } = await supabase
@@ -47,23 +45,18 @@ export default function Home() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-
     setLoading(true)
     setMessage('')
-
     const formData = new FormData()
     formData.append('image', file)
-
     const res = await fetch('/api/ocr', { method: 'POST', body: formData })
     const json = await res.json()
-
     if (json.error) {
       setMessage(`エラー: ${json.error}`)
     } else {
       setMessage('保存しました')
       fetchReceipts()
     }
-
     setLoading(false)
     e.target.value = ''
   }
@@ -84,7 +77,6 @@ export default function Home() {
     const csv = [header, ...rows]
       .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
       .join('\n')
-
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -97,103 +89,106 @@ export default function Home() {
   const total = receipts.reduce((sum, r) => sum + (r.amount ?? 0), 0)
 
   return (
-    <div className="min-h-screen bg-[#0d0d12] text-white">
+    <div className="min-h-screen bg-[#f7f6f3] font-sans">
 
-      {/* ヘッダー */}
-      <div className="relative px-5 pt-12 pb-20 overflow-hidden">
-        {/* 背景の光彩 */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Expense Tracker</p>
-        <h1 className="text-2xl font-semibold text-white mb-8">領収書管理</h1>
-
-        {/* 合計カード */}
-        <div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
-          <p className="text-xs text-slate-400 tracking-wide mb-2">今月の合計経費</p>
-          <p className="text-5xl font-bold text-amber-400 tracking-tight">
-            ¥{total.toLocaleString()}
-          </p>
-          <p className="text-xs text-slate-500 mt-2">{receipts.length} 件</p>
-          {/* 右下装飾 */}
-          <div className="absolute bottom-4 right-5 text-slate-700 text-6xl font-black select-none leading-none">
-            ¥
-          </div>
+      {/* ナビゲーションバー */}
+      <div className="bg-white border-b border-[#e9e9e7] px-5 py-4 flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg">🧾</span>
+          <span className="font-semibold text-[#37352f] text-sm tracking-tight">領収書管理</span>
         </div>
-      </div>
-
-      {/* アクションボタン */}
-      <div className="px-4 -mt-6 flex gap-3 mb-6">
-        <label className="flex-1 cursor-pointer relative group">
-          <div className="absolute inset-0 bg-amber-400 rounded-xl blur opacity-30 group-hover:opacity-50 transition-opacity" />
-          <div className="relative bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-black font-semibold text-center py-4 rounded-xl transition-colors">
-            {loading ? '読み取り中...' : '📷  撮影 / アップロード'}
-          </div>
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleUpload}
-            disabled={loading}
-          />
-        </label>
         <button
           onClick={handleDownloadCSV}
           disabled={receipts.length === 0}
-          className="px-5 py-4 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-30 text-slate-300 font-medium text-sm transition-colors"
+          className="flex items-center gap-1.5 text-xs text-[#787774] hover:text-[#37352f] hover:bg-[#f1f1ef] disabled:opacity-40 px-3 py-1.5 rounded-md transition-colors border border-[#e9e9e7]"
         >
-          CSV
+          ↓ CSV出力
         </button>
       </div>
 
-      {message && (
-        <div className="mx-4 mb-4 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm text-center">
-          {message}
-        </div>
-      )}
+      <div className="max-w-lg mx-auto px-4 pt-8 pb-16">
 
-      {/* レシート一覧 */}
-      <div className="px-4 space-y-3 pb-12">
-        {receipts.map((r) => {
-          const dot = CATEGORY_DOT[r.category ?? ''] ?? CATEGORY_DOT['未分類']
-          return (
-            <div
-              key={r.id}
-              className="rounded-2xl border border-white/8 bg-white/4 backdrop-blur p-4 hover:bg-white/7 transition-colors"
-            >
-              <div className="flex justify-between items-start gap-3">
+        {/* サマリー */}
+        <div className="mb-8">
+          <p className="text-xs text-[#9b9a97] uppercase tracking-widest mb-1">Total expenses</p>
+          <p className="text-5xl font-bold text-[#37352f] tracking-tight leading-none">
+            ¥{total.toLocaleString()}
+          </p>
+          <p className="text-sm text-[#9b9a97] mt-2">{receipts.length} 件の領収書</p>
+        </div>
+
+        {/* アップロードボタン */}
+        <label className="block cursor-pointer mb-2">
+          <div className="flex items-center justify-center gap-2 w-full py-3 rounded-lg bg-[#37352f] hover:bg-[#2f2e2b] active:bg-[#25241f] text-white text-sm font-medium transition-colors">
+            {loading ? (
+              <span className="text-[#9b9a97]">読み取り中...</span>
+            ) : (
+              <>
+                <span>📷</span>
+                <span>撮影 / アップロード</span>
+              </>
+            )}
+          </div>
+          <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={loading} />
+        </label>
+
+        {message && (
+          <p className="text-xs text-center text-[#9b9a97] mb-4">{message}</p>
+        )}
+
+        {/* 区切り */}
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-[#e9e9e7]" />
+          <span className="text-xs text-[#9b9a97]">最近の領収書</span>
+          <div className="flex-1 h-px bg-[#e9e9e7]" />
+        </div>
+
+        {/* レシート一覧 */}
+        <div className="bg-white rounded-xl border border-[#e9e9e7] overflow-hidden divide-y divide-[#e9e9e7]">
+          {receipts.map((r) => {
+            const style = CATEGORY_COLOR[r.category ?? ''] ?? CATEGORY_COLOR['未分類']
+            return (
+              <div
+                key={r.id}
+                className="flex items-center gap-3 px-4 py-3.5 hover:bg-[#f7f6f3] transition-colors group"
+              >
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
+
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-white truncate leading-tight">
+                  <p className="text-sm font-medium text-[#37352f] truncate">
                     {r.store_name ?? '店名不明'}
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">{formatDate(r.receipt_date)}</p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
-                    <span className="text-xs text-slate-400">{r.category ?? '未分類'}</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${style.pill}`}>
+                      {r.category ?? '未分類'}
+                    </span>
+                    <span className="text-xs text-[#9b9a97]">{formatDate(r.receipt_date)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <p className="text-xl font-bold text-amber-400">
-                    {r.amount != null ? `¥${r.amount.toLocaleString()}` : '—'}
-                  </p>
-                  <button
-                    onClick={() => handleDelete(r.id)}
-                    className="w-7 h-7 flex items-center justify-center rounded-full text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors text-lg"
-                    aria-label="削除"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
 
-        {receipts.length === 0 && (
-          <div className="text-center py-20 text-slate-600">
-            <p className="text-5xl mb-4">🧾</p>
-            <p className="text-sm">レシートがまだありません</p>
-          </div>
-        )}
+                <p className="text-sm font-semibold text-[#37352f] flex-shrink-0">
+                  {r.amount != null ? `¥${r.amount.toLocaleString()}` : '—'}
+                </p>
+
+                <button
+                  onClick={() => handleDelete(r.id)}
+                  className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-red-500 hover:bg-red-50 transition-all text-base flex-shrink-0"
+                  aria-label="削除"
+                >
+                  ×
+                </button>
+              </div>
+            )
+          })}
+
+          {receipts.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="text-3xl mb-3">🧾</p>
+              <p className="text-sm text-[#9b9a97]">レシートがまだありません</p>
+              <p className="text-xs text-[#c4c3bf] mt-1">上のボタンから撮影して追加できます</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
