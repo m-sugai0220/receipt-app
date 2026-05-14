@@ -55,23 +55,36 @@ function extractReceiptInfo(text: string): {
 
   const store_name = lines[0] ?? null
 
-  // 合計キーワードの直後にある金額を優先、なければ最大の ¥ 金額
-  const labeledMatch = text.match(/(合計|小計|お会計|TOTAL|Total|total|税込)[^\d¥￥\n]{0,10}[¥￥]?\s*(\d[\d,]+)/)
-  if (labeledMatch) {
-    const amount = parseInt(labeledMatch[2].replace(/,/g, ''), 10)
-    return { store_name, amount, receipt_date: extractDate(text) }
-  }
-  const yenMatches = [...text.matchAll(/[¥￥]\s*(\d[\d,]+)/g)]
-  const amount = yenMatches.length > 0
-    ? Math.max(...yenMatches.map((m) => parseInt(m[1].replace(/,/g, ''), 10)))
-    : null
-
+  const amount = extractAmount(text)
   return { store_name, amount, receipt_date: extractDate(text) }
 }
 
+function extractAmount(text: string): number | null {
+  const parse = (s: string) => parseInt(s.replace(/,/g, ''), 10)
+
+  // 1. 合計・お会計・TOTAL を最優先（小計・税込より後に出る最終金額）
+  const totalMatch = text.match(/(合\s*計|お会計|TOTAL|Total)[^\d¥￥\n]{0,15}[¥￥]?\s*(\d[\d,]+)/)
+  if (totalMatch) return parse(totalMatch[2])
+
+  // 2. 税込合計
+  const taxTotalMatch = text.match(/税込[^\d¥￥\n]{0,15}[¥￥]?\s*(\d[\d,]+)/)
+  if (taxTotalMatch) return parse(taxTotalMatch[1])
+
+  // 3. ¥/￥ 付きの金額がある場合は最大値（明細の最大 = 合計に近い）
+  const yenMatches = [...text.matchAll(/[¥￥]\s*(\d[\d,]+)/g)]
+  if (yenMatches.length > 0)
+    return Math.max(...yenMatches.map((m) => parse(m[1])))
+
+  // 4. 小計（最終手段）
+  const subtotalMatch = text.match(/小\s*計[^\d¥￥\n]{0,15}[¥￥]?\s*(\d[\d,]+)/)
+  if (subtotalMatch) return parse(subtotalMatch[1])
+
+  return null
+}
+
 function extractDate(text: string): string | null {
-  // 西暦: 2026年5月13日 / 2026/5/13 / 2026-5-13 / 2026.5.13
-  const westernMatch = text.match(/(\d{4})[年\/\-\.](\d{1,2})[月\/\-\.](\d{1,2})/)
+  // 西暦: 2026年5月13日 / 2026/5/13 / 2026-5-13 / 2026. 5.13（スペース混入含む）
+  const westernMatch = text.match(/(\d{4})\s*[年\/\-\.]\s*(\d{1,2})\s*[月\/\-\.]\s*(\d{1,2})/)
   if (westernMatch) {
     return `${westernMatch[1]}-${westernMatch[2].padStart(2, '0')}-${westernMatch[3].padStart(2, '0')}`
   }
