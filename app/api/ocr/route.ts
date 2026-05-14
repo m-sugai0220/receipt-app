@@ -55,15 +55,37 @@ function extractReceiptInfo(text: string): {
 
   const store_name = lines[0] ?? null
 
-  const amountMatch = text.match(/[合計|計|TOTAL|total][\s\S]*?(\d[\d,]+)/)
-  const amount = amountMatch
-    ? parseInt(amountMatch[1].replace(/,/g, ''), 10)
+  // 合計キーワードの直後にある金額を優先、なければ最大の ¥ 金額
+  const labeledMatch = text.match(/(合計|小計|お会計|TOTAL|Total|total|税込)[^\d¥￥\n]{0,10}[¥￥]?\s*(\d[\d,]+)/)
+  if (labeledMatch) {
+    const amount = parseInt(labeledMatch[2].replace(/,/g, ''), 10)
+    return { store_name, amount, receipt_date: extractDate(text) }
+  }
+  const yenMatches = [...text.matchAll(/[¥￥]\s*(\d[\d,]+)/g)]
+  const amount = yenMatches.length > 0
+    ? Math.max(...yenMatches.map((m) => parseInt(m[1].replace(/,/g, ''), 10)))
     : null
 
-  const dateMatch = text.match(/(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})/)
-  const receipt_date = dateMatch
-    ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`
-    : null
+  return { store_name, amount, receipt_date: extractDate(text) }
+}
 
-  return { store_name, amount, receipt_date }
+function extractDate(text: string): string | null {
+  // 西暦: 2026年5月13日 / 2026/5/13 / 2026-5-13 / 2026.5.13
+  const westernMatch = text.match(/(\d{4})[年\/\-\.](\d{1,2})[月\/\-\.](\d{1,2})/)
+  if (westernMatch) {
+    return `${westernMatch[1]}-${westernMatch[2].padStart(2, '0')}-${westernMatch[3].padStart(2, '0')}`
+  }
+  // 令和: 令和8年5月13日
+  const reiwaMatch = text.match(/令和\s*(\d{1,2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})/)
+  if (reiwaMatch) {
+    const year = 2018 + parseInt(reiwaMatch[1], 10)
+    return `${year}-${reiwaMatch[2].padStart(2, '0')}-${reiwaMatch[3].padStart(2, '0')}`
+  }
+  // R8.5.13 形式
+  const rShortMatch = text.match(/R\s*(\d{1,2})[.\/](\d{1,2})[.\/](\d{1,2})/)
+  if (rShortMatch) {
+    const year = 2018 + parseInt(rShortMatch[1], 10)
+    return `${year}-${rShortMatch[2].padStart(2, '0')}-${rShortMatch[3].padStart(2, '0')}`
+  }
+  return null
 }

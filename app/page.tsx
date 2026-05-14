@@ -7,6 +7,7 @@ export default function Home() {
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [debugText, setDebugText] = useState('')
 
   useEffect(() => {
     fetchReceipts()
@@ -37,6 +38,7 @@ export default function Home() {
       setMessage(`エラー: ${json.error}`)
     } else {
       setMessage('保存しました！')
+      setDebugText(json.raw_text ?? '')
       fetchReceipts()
     }
 
@@ -63,7 +65,12 @@ export default function Home() {
         </label>
       </div>
 
-      {message && <p className="text-sm text-center text-gray-600 mb-4">{message}</p>}
+      {message && <p className="text-sm text-center text-gray-600 mb-2">{message}</p>}
+      {debugText && (
+        <pre className="text-xs bg-yellow-50 border border-yellow-300 rounded p-2 mb-4 whitespace-pre-wrap break-all">
+          {debugText}
+        </pre>
+      )}
 
       <div className="bg-gray-100 rounded-lg p-3 mb-4 text-right">
         <span className="text-sm text-gray-500">合計金額</span>
