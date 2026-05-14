@@ -82,6 +82,9 @@ export default function Home() {
               <div>
                 <p className="font-semibold">{r.store_name ?? '店名不明'}</p>
                 <p className="text-sm text-gray-500">{r.receipt_date ?? '日付不明'}</p>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                  {r.category ?? '未分類'}
+                </span>
               </div>
               <div className="flex items-center gap-3">
                 <p className="text-lg font-bold text-blue-600">

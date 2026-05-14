@@ -12,5 +12,6 @@ export type Receipt = {
   receipt_date: string | null
   raw_text: string | null
   image_url: string | null
+  category: string | null
   created_at: string
 }

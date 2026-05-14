@@ -32,10 +32,11 @@ export async function POST(request: NextRequest) {
   const rawText: string = visionData.responses?.[0]?.fullTextAnnotation?.text ?? ''
 
   const { store_name, amount, receipt_date } = extractReceiptInfo(rawText)
+  const category = guessCategory(rawText)
 
   const { data, error } = await supabase
     .from('receipts')
-    .insert({ store_name, amount, receipt_date, raw_text: rawText })
+    .insert({ store_name, amount, receipt_date, raw_text: rawText, category })
     .select()
     .single()
 
@@ -86,6 +87,27 @@ function extractAmount(text: string): number | null {
   if (subtotalMatch) return parse(subtotalMatch[1])
 
   return null
+}
+
+function guessCategory(text: string): string {
+  const t = text
+
+  if (/通行料金|高速|NEXCO|ETC|電車|タクシー|新幹線|鉄道|バス|JR|航空|飛行機/.test(t)) return '旅費交通費'
+  if (/駐車場/.test(t)) return '旅費交通費'
+  if (/ガソリン|給油|燃料/.test(t)) return '車両費'
+  if (/ChatGPT|Claude|Notion|Canva|Zoom|Vercel|AWS|Azure|ドメイン|サブスク|subscription/.test(t)) return '通信費'
+  if (/携帯|スマホ|docomo|ドコモ|SoftBank|ソフトバンク|au|NTT|インターネット|回線/.test(t)) return '通信費'
+  if (/セミナー|研修|講習|ウェビナー/.test(t)) return '研修費'
+  if (/書籍|本|図書|Amazon|ブックス/.test(t)) return '新聞図書費'
+  if (/広告|LP制作|チラシ|展示会|名刺/.test(t)) return '広告宣伝費'
+  if (/外注|デザイン|開発|フリーランス|業務委託/.test(t)) return '外注費'
+  if (/振込手数料|手数料/.test(t)) return '支払手数料'
+  if (/印紙|証明書|役所|行政/.test(t)) return '租税公課'
+  if (/コワーキング|シェアオフィス|WeWork/.test(t)) return '地代家賃'
+  if (/文房具|ステーショナリー|コクヨ|ロフト/.test(t)) return '消耗品費'
+  if (/レストラン|居酒屋|焼肉|寿司|ランチ|ディナー|カフェ|飲食/.test(t)) return '接待交際費'
+
+  return '未分類'
 }
 
 function extractDate(text: string): string | null {
