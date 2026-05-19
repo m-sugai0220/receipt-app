@@ -167,6 +167,8 @@ function extractAmount(text: string): number | null {
 function guessCategory(text: string): string {
   const t = text
 
+  // 飲食を最優先（ホテル内レストランなど「HOTEL」が混入するケース対応）
+  if (/レストラン|居酒屋|焼肉|寿司|ランチ|ディナー|カフェ|飲食|食事|お食事|ビール|日本酒|焼酎|ワイン|酎ハイ|ハイボール|サワー|コース料理|お食事代|酒場|ダイニング|バル|割烹/.test(t)) return '接待交際費'
   if (/通行料金|高速|NEXCO|ETC|電車|タクシー|新幹線|鉄道|バス|JR|航空|飛行機/.test(t)) return '旅費交通費'
   if (/駐車場/.test(t)) return '旅費交通費'
   if (/ホテル|旅館|宿泊|HOTEL|inn|INN/.test(t)) return '旅費交通費'
@@ -184,7 +186,6 @@ function guessCategory(text: string): string {
   if (/セブン[‐－-]?イレブン|ローソン|ファミリーマート|ファミマ|ミニストップ|デイリーヤマザキ/.test(t)) return '消耗品費'
   if (/マツモトキヨシ|マツキヨ|ウエルシア|ツルハ|スギ薬局|薬局|ドラッグ/.test(t)) return '消耗品費'
   if (/文房具|ステーショナリー|コクヨ|ロフト/.test(t)) return '消耗品費'
-  if (/レストラン|居酒屋|焼肉|寿司|ランチ|ディナー|カフェ|飲食|食事|お食事|ビール|日本酒|焼酎|ワイン|酎ハイ|ハイボール|サワー|コース料理|お食事代|酒場|ダイニング|バル|割烹/.test(t)) return '接待交際費'
 
   return '未分類'
 }
