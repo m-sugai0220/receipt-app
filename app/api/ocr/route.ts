@@ -99,18 +99,31 @@ function extractAmount(text: string): number | null {
   const parse = (s: string) => parseInt(s.replace(/,/g, ''), 10)
   const currency = '[¥￥\\\\]'
 
-  // お預かり・お釣り・おつりの行は除外（領収金額ではないため）
+  // お預かり・おつり・釣銭の行を除外（領収金額ではない）
   const filtered = text
     .split('\n')
-    .filter((l) => !/お?預り?金?|お預かり|おつり|お釣り|釣り銭|チェンジ|CHANGE|CASH|キャッシュ/.test(l))
+    .filter((l) => !/預かり|お?預り|おつり|お?釣り?|釣銭|チェンジ|CHANGE|CASH|キャッシュ/.test(l))
     .join('\n')
 
-  // 1. 合計・お会計・TOTAL・領収金額・請求金額など（最終金額キーワード）
+  // 0. 「領収書」直後の行の金額（飲食店の手書き・スタンプ型領収書に多いパターン）
+  const receiptHeaderMatch = filtered.match(
+    new RegExp(`領収書\\s*\\n\\s*${currency}?\\s*(\\d[\\d,]+)`)
+  )
+  if (receiptHeaderMatch) return parse(receiptHeaderMatch[1])
+
+  // 1. 合計・お会計・TOTAL等のキーワードと金額が同一行
   const totalMatch = filtered.match(new RegExp(
     `(領収金額|お買上[げ]?合計|ご?請求金額|お支払[い]?金額|合\\s*計|お会計|TOTAL|Total)` +
     `[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`
   ))
   if (totalMatch) return parse(totalMatch[2])
+
+  // 1b. キーワードと金額が改行で分かれている場合
+  const totalNextLineMatch = filtered.match(new RegExp(
+    `(領収金額|お買上[げ]?合計|ご?請求金額|お支払[い]?金額|合\\s*計|お会計|TOTAL|Total)` +
+    `\\s*\\n\\s*${currency}?\\s*(\\d[\\d,]+)`
+  ))
+  if (totalNextLineMatch) return parse(totalNextLineMatch[2])
 
   // 2. 通行料金（高速道路・交通系領収書）
   const tollMatch = filtered.match(new RegExp(`通行料金[^\\d¥￥\\\\\\n]{0,15}${currency}\\s*(\\d[\\d,]+)`))
