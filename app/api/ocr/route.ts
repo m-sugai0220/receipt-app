@@ -99,11 +99,22 @@ function extractAmount(text: string): number | null {
   const parse = (s: string) => parseInt(s.replace(/,/g, ''), 10)
   const currency = '[¥￥\\\\]'
 
-  // お預かり・おつり・釣銭の行を除外（領収金額ではない）
-  const filtered = text
-    .split('\n')
-    .filter((l) => !/預かり|お?預り|おつり|お?釣り?|釣銭|チェンジ|CHANGE|CASH|キャッシュ/.test(l))
-    .join('\n')
+  // お預かり・おつり行と、その直後に来る単独の金額行をセットで除外
+  // （金額が別行になっているレシートで金額行だけが残るのを防ぐ）
+  const cashReceivedRe = /預かり|お?預り|おつり|お?釣り?|釣銭|チェンジ|CHANGE|CASH|キャッシュ/
+  const standaloneAmountRe = /^\s*[¥￥\\]?\s*\d[\d,]*\s*円?\s*$/
+  const lines = text.split('\n')
+  const kept: string[] = []
+  let dropNext = false
+  for (const line of lines) {
+    if (dropNext) {
+      dropNext = false
+      if (standaloneAmountRe.test(line)) continue
+    }
+    if (cashReceivedRe.test(line)) { dropNext = true; continue }
+    kept.push(line)
+  }
+  const filtered = kept.join('\n')
 
   // 0. 「領収書」直後の行の金額（飲食店の手書き・スタンプ型領収書に多いパターン）
   const receiptHeaderMatch = filtered.match(
