@@ -99,9 +99,9 @@ function extractAmount(text: string): number | null {
   const parse = (s: string) => parseInt(s.replace(/,/g, ''), 10)
   const currency = '[¥￥\\\\]'
 
-  // お預かり・おつり行と、その直後に来る単独の金額行をセットで除外
-  // （金額が別行になっているレシートで金額行だけが残るのを防ぐ）
+  // お預かり・おつり・現金（支払い行）と、その直後の単独金額行をセットで除外
   const cashReceivedRe = /預かり|お?預り|おつり|お?釣り?|釣銭|チェンジ|CHANGE|CASH|キャッシュ/
+  const cashStandaloneRe = /^\s*現金\s*$/
   const standaloneAmountRe = /^\s*[¥￥\\]?\s*\d[\d,]*\s*円?\s*$/
   const lines = text.split('\n')
   const kept: string[] = []
@@ -111,16 +111,19 @@ function extractAmount(text: string): number | null {
       dropNext = false
       if (standaloneAmountRe.test(line)) continue
     }
-    if (cashReceivedRe.test(line)) { dropNext = true; continue }
+    if (cashReceivedRe.test(line) || cashStandaloneRe.test(line)) { dropNext = true; continue }
     kept.push(line)
   }
   const filtered = kept.join('\n')
 
-  // 0. 「領収書」直後の行の金額（飲食店の手書き・スタンプ型領収書に多いパターン）
-  const receiptHeaderMatch = filtered.match(
-    new RegExp(`領収書\\s*\\n\\s*${currency}?\\s*(\\d[\\d,]+)`)
-  )
-  if (receiptHeaderMatch) return parse(receiptHeaderMatch[1])
+  // 0. 「領収書」以降3行以内の最初の¥金額（宛名が1行挟まる形式に対応）
+  const receiptHeaderIdx = kept.findIndex(l => /領収書/.test(l))
+  if (receiptHeaderIdx >= 0) {
+    for (let i = receiptHeaderIdx + 1; i < Math.min(receiptHeaderIdx + 4, kept.length); i++) {
+      const m = kept[i].match(new RegExp(`${currency}\\s*(\\d[\\d,]+)`))
+      if (m) return parse(m[1])
+    }
+  }
 
   // 1. 合計・お会計・TOTAL等のキーワードと金額が同一行
   const totalMatch = filtered.match(new RegExp(
