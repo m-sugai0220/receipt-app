@@ -75,6 +75,8 @@ export default function Home() {
   const [saving, setSaving] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('all')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [csvFrom, setCsvFrom] = useState('')
+  const [csvTo, setCsvTo] = useState('')
 
   useEffect(() => { fetchReceipts() }, [])
 
@@ -144,8 +146,14 @@ export default function Home() {
   }
 
   function handleDownloadCSV() {
+    const filtered = receipts.filter((r) => {
+      const d = r.receipt_date ?? ''
+      if (csvFrom && d && d < csvFrom) return false
+      if (csvTo && d && d > csvTo) return false
+      return true
+    })
     const header = ['日付', '店名', '金額', '勘定科目']
-    const rows = receipts.map((r) => [
+    const rows = filtered.map((r) => [
       r.receipt_date ?? '',
       r.store_name ?? '',
       r.amount != null ? String(r.amount) : '',
@@ -158,7 +166,8 @@ export default function Home() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `経費精算_${new Date().toISOString().slice(0, 10)}.csv`
+    const suffix = csvFrom || csvTo ? `${csvFrom || ''}〜${csvTo || ''}` : new Date().toISOString().slice(0, 10)
+    a.download = `経費精算_${suffix}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -281,13 +290,28 @@ export default function Home() {
           <span className="text-lg">🧾</span>
           <span className="font-semibold text-[#37352f] text-sm tracking-tight">領収書管理</span>
         </div>
-        <button
-          onClick={handleDownloadCSV}
-          disabled={receipts.length === 0}
-          className="flex items-center gap-1.5 text-xs text-[#787774] hover:text-[#37352f] hover:bg-[#f1f1ef] disabled:opacity-40 px-3 py-1.5 rounded-md transition-colors border border-[#e9e9e7]"
-        >
-          ↓ CSV出力
-        </button>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={csvFrom}
+            onChange={(e) => setCsvFrom(e.target.value)}
+            className="text-xs text-[#787774] border border-[#e9e9e7] rounded-md px-2 py-1.5 bg-white focus:outline-none"
+          />
+          <span className="text-xs text-[#9b9a97]">〜</span>
+          <input
+            type="date"
+            value={csvTo}
+            onChange={(e) => setCsvTo(e.target.value)}
+            className="text-xs text-[#787774] border border-[#e9e9e7] rounded-md px-2 py-1.5 bg-white focus:outline-none"
+          />
+          <button
+            onClick={handleDownloadCSV}
+            disabled={receipts.length === 0}
+            className="flex items-center gap-1.5 text-xs text-[#787774] hover:text-[#37352f] hover:bg-[#f1f1ef] disabled:opacity-40 px-3 py-1.5 rounded-md transition-colors border border-[#e9e9e7]"
+          >
+            ↓ CSV出力
+          </button>
+        </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 pt-8 pb-16">
