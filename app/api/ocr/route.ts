@@ -153,6 +153,13 @@ function extractAmount(text: string): number | null {
   ))
   if (totalNextLineMatch) return parse(totalNextLineMatch[2])
 
+  // 1c. 英語レシートの合計キーワード（Peach Aviation等、次行に金額）
+  const engTotalMatch = filtered.match(new RegExp(
+    `(THE SUM OF|TOTAL AMOUNT|AMOUNT DUE|GRAND TOTAL|AMOUNT PAID)` +
+    `\\s*\\n\\s*${currency}?\\s*(\\d[\\d,]+)`
+  ))
+  if (engTotalMatch) return parse(engTotalMatch[2])
+
   // 2. 通行料金（高速道路・交通系領収書）
   const tollMatch = filtered.match(new RegExp(`通行料金[^\\d¥￥\\\\\\n]{0,15}${currency}\\s*(\\d[\\d,]+)`))
   if (tollMatch) return parse(tollMatch[1])
@@ -163,8 +170,13 @@ function extractAmount(text: string): number | null {
 
   // 4. 通貨記号付きの金額の最大値（預り金除外済みテキストから）
   const yenMatches = [...filtered.matchAll(new RegExp(`${currency}\\s*(\\d[\\d,]+)`, 'g'))]
-  if (yenMatches.length > 0)
-    return Math.max(...yenMatches.map((m) => parse(m[1])))
+  if (yenMatches.length > 0) {
+    const amounts = yenMatches.map((m) => parse(m[1]))
+    // 年号(2000-2099)と小額(100未満)を除外した候補を優先
+    const plausible = amounts.filter(a => !(a >= 2000 && a <= 2099) && a >= 100)
+    if (plausible.length > 0) return Math.max(...plausible)
+    return Math.max(...amounts)
+  }
 
   // 5. 円サフィックス付き金額の最大値（¥記号なしのレシート対応）
   const enMatches = [...filtered.matchAll(/(\d[\d,]+)円(?!\s*引き|割)/g)]
@@ -183,7 +195,7 @@ function guessCategory(text: string): string {
 
   // 飲食を最優先（ホテル内レストランなど「HOTEL」が混入するケース対応）
   if (/レストラン|居酒屋|焼肉|寿司|ランチ|ディナー|カフェ|飲食|食事|お食事|ビール|日本酒|焼酎|ワイン|酎ハイ|ハイボール|サワー|コース料理|お食事代|酒場|ダイニング|バル|割烹/.test(t)) return '接待交際費'
-  if (/通行料金|高速|NEXCO|ETC|電車|タクシー|新幹線|鉄道|バス|JR|航空|飛行機/.test(t)) return '旅費交通費'
+  if (/通行料金|高速|NEXCO|ETC|電車|タクシー|新幹線|鉄道|バス|JR|航空|飛行機|搭乗|航空券|Peach|peach|ANA|JAL|LCC|Aviation|FLIGHT|flight|BOOKING REFERENCE|予約番号/.test(t)) return '旅費交通費'
   if (/駐車場/.test(t)) return '旅費交通費'
   if (/ホテル|旅館|宿泊|HOTEL|inn|INN/.test(t)) return '旅費交通費'
   if (/ガソリン|給油|燃料/.test(t)) return '車両費'
