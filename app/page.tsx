@@ -879,6 +879,19 @@ export default function Home() {
               />
             </div>
 
+            {ocrPreview.raw_text && (
+              <details className="mb-4">
+                <summary className="text-xs text-[#9b9a97] cursor-pointer hover:text-[#37352f] select-none">
+                  OCR読み取りテキストを確認
+                </summary>
+                <textarea
+                  readOnly
+                  value={ocrPreview.raw_text}
+                  className="mt-2 w-full h-32 text-xs text-[#37352f] bg-[#fafaf8] border border-[#e9e9e7] rounded-lg px-3 py-2 resize-none font-mono"
+                />
+              </details>
+            )}
+
             <div className="flex gap-2">
               <button
                 onClick={() => setOcrPreview(null)}
