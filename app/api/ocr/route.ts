@@ -91,6 +91,11 @@ function extractReceiptInfo(text: string): {
   const bizNameMatch = normalized.match(/事業者名[：:]\s*(.+)/)
   const store_name_from_biz = bizNameMatch?.[1].trim() ?? null
 
+  // 〒+郵便番号の後ろに法人名がある場合を取得（日本郵便等）
+  const postalLineMatch = normalized.match(/〒\d{3}-?\d{4}\s+(.+)/)
+  const postalCandidate = postalLineMatch?.[1]?.trim() ?? ''
+  const store_name_from_postal = /株式会社|有限会社|合同会社/.test(postalCandidate) ? postalCandidate : null
+
   // 店名として不適切な行を除外するパターン
   const skipPattern = new RegExp(
     'ありがとう|領収|レシート|証明書|料金所|停車|ください|上記|保管|印刷|但し' +
@@ -101,9 +106,10 @@ function extractReceiptInfo(text: string): {
     '|丁目|番地|番|号' +                                  // 住所
     '|合計|小計|会計|明細|内訳|税込|税抜|消費税|税率' +  // 集計行
     '|登録番号|事業者名|No\\.|POS|テーブル|担当|受付' +  // レシートメタデータ
-    '|割引|値引|ポイント|御中|様$'                         // その他除外ワード
+    '|割引|値引|ポイント|御中|様$' +                       // その他除外ワード
+    '|^\\[.*\\]$'                                          // [証紙切手引受]等のブラケット囲み
   )
-  const store_name = store_name_from_biz ?? (lines.find((l) => l.length >= 3 && !skipPattern.test(l)) ?? null)
+  const store_name = store_name_from_biz ?? store_name_from_postal ?? (lines.find((l) => l.length >= 3 && !skipPattern.test(l)) ?? null)
 
   const amount = extractAmount(normalized)
   return { store_name, amount, receipt_date: extractDate(normalized) }
