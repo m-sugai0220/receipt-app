@@ -154,8 +154,9 @@ function extractAmount(text: string): number | null {
   if (totalNextLineMatch) return parse(totalNextLineMatch[2])
 
   // 1c. 英語レシートの合計キーワード（Peach Aviation等、次行に金額）
+  // FORM OF PAYMENT: Peachの場合 "FORM OF PAYMENT\n¥10,350" の構造になる
   const engTotalMatch = filtered.match(new RegExp(
-    `(THE SUM OF|TOTAL AMOUNT|AMOUNT DUE|GRAND TOTAL|AMOUNT PAID)` +
+    `(FORM OF PAYMENT|THE SUM OF|TOTAL AMOUNT|AMOUNT DUE|GRAND TOTAL|AMOUNT PAID)` +
     `\\s*\\n\\s*${currency}?\\s*(\\d[\\d,]+)`
   ))
   if (engTotalMatch) return parse(engTotalMatch[2])
@@ -164,9 +165,12 @@ function extractAmount(text: string): number | null {
   const tollMatch = filtered.match(new RegExp(`通行料金[^\\d¥￥\\\\\\n]{0,15}${currency}\\s*(\\d[\\d,]+)`))
   if (tollMatch) return parse(tollMatch[1])
 
-  // 3. 税込合計
+  // 3. 税込合計（改行越えに年号を誤認しないよう年号フィルタを追加）
   const taxTotalMatch = filtered.match(new RegExp(`税込[^\\d¥￥\\\\\\n]{0,15}${currency}?\\s*(\\d[\\d,]+)`))
-  if (taxTotalMatch) return parse(taxTotalMatch[1])
+  if (taxTotalMatch) {
+    const v = parse(taxTotalMatch[1])
+    if (!(v >= 1990 && v <= 2099)) return v
+  }
 
   // 4. 通貨記号付きの金額の最大値（預り金除外済みテキストから）
   const yenMatches = [...filtered.matchAll(new RegExp(`${currency}\\s*(\\d[\\d,]+)`, 'g'))]
