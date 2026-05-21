@@ -116,7 +116,7 @@ function extractAmount(text: string): number | null {
   // お預かり・おつり・現金（支払い行）と、その直後の単独金額行をセットで除外
   const cashReceivedRe = /預かり|お?預り|おつり|お?釣り?|釣銭|チェンジ|CHANGE|CASH|キャッシュ/
   const cashStandaloneRe = /^\s*現金\s*$/
-  const standaloneAmountRe = /^\s*[¥￥\\]?\s*\d[\d,]*\s*円?\s*$/
+  const standaloneAmountRe = /^\s*[¥￥\\]?\s*\d[\d,]*\s*[円）)]?\s*$/
   const lines = text.split('\n')
   const kept: string[] = []
   let dropNext = false
