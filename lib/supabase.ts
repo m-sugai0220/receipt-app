@@ -13,5 +13,6 @@ export type Receipt = {
   raw_text: string | null
   image_url: string | null
   category: string | null
+  memo: string | null
   created_at: string
 }

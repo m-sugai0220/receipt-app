@@ -51,17 +51,7 @@ export async function POST(request: NextRequest) {
     image_url = urlData.publicUrl
   }
 
-  const { data, error } = await supabase
-    .from('receipts')
-    .insert({ store_name, amount, receipt_date, raw_text: rawText, category, image_url })
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ receipt: data, raw_text: rawText })
+  return NextResponse.json({ store_name, amount, receipt_date, raw_text: rawText, category, image_url })
 }
 
 // 全角数字・記号を半角に正規化（OCRが全角を返すケース対応）
