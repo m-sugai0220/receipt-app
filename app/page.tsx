@@ -24,7 +24,7 @@ const CATEGORY_COLOR: Record<string, { dot: string; pill: string }> = {
 
 const CATEGORIES = Object.keys(CATEGORY_COLOR)
 
-type ViewMode = 'all' | 'monthly' | 'category'
+type ViewMode = 'all' | 'monthly' | 'category' | 'applied'
 
 type EditForm = {
   store_name: string
@@ -79,6 +79,16 @@ function groupByCategory(receipts: Receipt[]): { cat: string; items: Receipt[]; 
     .sort((a, b) => b.total - a.total)
 }
 
+function groupByAppliedDate(receipts: Receipt[]): [string, Receipt[]][] {
+  const map = new Map<string, Receipt[]>()
+  for (const r of receipts) {
+    const key = r.applied_at ? r.applied_at.slice(0, 10) : 'unknown'
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(r)
+  }
+  return [...map.entries()].sort(([a], [b]) => b.localeCompare(a))
+}
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -96,10 +106,11 @@ export default function Home() {
   const [csvTo, setCsvTo] = useState('')
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [isSelectMode, setIsSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [applying, setApplying] = useState(false)
   const [ocrPreview, setOcrPreview] = useState<OcrPreviewData | null>(null)
+  const [csvDateField, setCsvDateField] = useState<'receipt' | 'applied'>('receipt')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -128,6 +139,11 @@ export default function Home() {
       (r.memo ?? '').toLowerCase().includes(q)
     )
   }, [receipts, searchQuery])
+
+  const appliedReceipts = useMemo(
+    () => filteredReceipts.filter((r) => r.applied_at != null),
+    [filteredReceipts]
+  )
 
   async function fetchReceipts() {
     const { data } = await supabase
@@ -202,8 +218,21 @@ export default function Home() {
     await supabase.from('receipts').delete().in('id', ids)
     setReceipts((prev) => prev.filter((r) => !selectedIds.has(r.id)))
     setSelectedIds(new Set())
-    setIsSelectMode(false)
     setBulkDeleting(false)
+  }
+
+  async function handleApply() {
+    if (selectedIds.size === 0) return
+    setApplying(true)
+    const now = new Date().toISOString()
+    const ids = [...selectedIds]
+    await supabase.from('receipts').update({ applied_at: now }).in('id', ids)
+    setReceipts((prev) =>
+      prev.map((r) => (selectedIds.has(r.id) ? { ...r, applied_at: now } : r))
+    )
+    setSelectedIds(new Set())
+    setApplying(false)
+    setMessage(`${ids.length}件を申請済みにしました`)
   }
 
   function toggleSelect(id: string) {
@@ -256,14 +285,22 @@ export default function Home() {
   }
 
   function handleDownloadCSV() {
-    const filtered = receipts.filter((r) => {
-      const d = r.receipt_date ?? ''
+    const source = csvDateField === 'applied'
+      ? receipts.filter((r) => r.applied_at != null)
+      : receipts
+
+    const filtered = source.filter((r) => {
+      const d = csvDateField === 'applied'
+        ? (r.applied_at ?? '').slice(0, 10)
+        : (r.receipt_date ?? '')
       if (csvFrom && d && d < csvFrom) return false
       if (csvTo && d && d > csvTo) return false
       return true
     })
-    const header = ['日付', '店名', '金額', '勘定科目', 'メモ']
+
+    const header = ['申請日', '日付', '店名', '金額', '勘定科目', 'メモ']
     const rows = filtered.map((r) => [
+      r.applied_at ? r.applied_at.slice(0, 10) : '',
       r.receipt_date ?? '',
       r.store_name ?? '',
       r.amount != null ? String(r.amount) : '',
@@ -278,21 +315,24 @@ export default function Home() {
     const a = document.createElement('a')
     a.href = url
     const suffix = csvFrom || csvTo ? `${csvFrom || ''}〜${csvTo || ''}` : new Date().toISOString().slice(0, 10)
-    a.download = `経費精算_${suffix}.csv`
+    const prefix = csvDateField === 'applied' ? '申請済み経費' : '経費精算'
+    a.download = `${prefix}_${suffix}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  function renderReceiptRow(r: Receipt) {
+  function renderReceiptRow(r: Receipt, showCheckbox = true) {
     const style = CATEGORY_COLOR[r.category ?? ''] ?? CATEGORY_COLOR['未分類']
     const isEditing = editingId === r.id
     const isSelected = selectedIds.has(r.id)
+    const isApplied = r.applied_at != null
 
     if (isEditing && editForm) {
       const editStyle = CATEGORY_COLOR[editForm.category] ?? CATEGORY_COLOR['未分類']
       return (
         <div key={r.id} className="px-4 py-3 bg-[#fafaf8]">
           <div className="flex items-center gap-2 mb-2">
+            {showCheckbox && <div className="w-4 flex-shrink-0" />}
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${editStyle.dot}`} />
             <input
               type="text"
@@ -309,7 +349,7 @@ export default function Home() {
               className="w-24 text-sm font-semibold text-[#37352f] bg-white border border-[#d9d9d6] rounded px-2 py-1 outline-none focus:border-[#37352f] transition-colors text-right"
             />
           </div>
-          <div className="flex items-center gap-2 pl-4 mb-2">
+          <div className="flex items-center gap-2 pl-6 mb-2">
             <select
               value={editForm.category}
               onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
@@ -326,7 +366,7 @@ export default function Home() {
               className="text-xs text-[#9b9a97] bg-white border border-[#d9d9d6] rounded px-1.5 py-1 outline-none focus:border-[#37352f] transition-colors"
             />
           </div>
-          <div className="pl-4 mb-2">
+          <div className="pl-6 mb-2">
             <input
               type="text"
               value={editForm.memo}
@@ -335,12 +375,9 @@ export default function Home() {
               className="w-full text-xs text-[#37352f] bg-white border border-[#d9d9d6] rounded px-2 py-1.5 outline-none focus:border-[#37352f] transition-colors"
             />
           </div>
-          <div className="flex items-center gap-2 pl-4">
+          <div className="flex items-center gap-2 pl-6">
             <div className="flex-1" />
-            <button
-              onClick={cancelEdit}
-              className="text-xs text-[#9b9a97] hover:text-[#37352f] px-2 py-1 rounded hover:bg-[#f1f1ef] transition-colors"
-            >
+            <button onClick={cancelEdit} className="text-xs text-[#9b9a97] hover:text-[#37352f] px-2 py-1 rounded hover:bg-[#f1f1ef] transition-colors">
               キャンセル
             </button>
             <button
@@ -360,7 +397,7 @@ export default function Home() {
         key={r.id}
         className={`flex items-center gap-3 px-4 py-3.5 hover:bg-[#f7f6f3] transition-colors group ${isSelected ? 'bg-blue-50' : ''}`}
       >
-        {isSelectMode && (
+        {showCheckbox && (
           <input
             type="checkbox"
             checked={isSelected}
@@ -377,6 +414,11 @@ export default function Home() {
             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${style.pill}`}>
               {r.category ?? '未分類'}
             </span>
+            {isApplied && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border bg-green-50 text-green-600 border-green-100">
+                ✓ 申請済
+              </span>
+            )}
             <span className="text-xs text-[#9b9a97]">{formatDate(r.receipt_date)}</span>
             {r.memo && (
               <span className="text-xs text-[#9b9a97] truncate max-w-[160px]" title={r.memo}>
@@ -388,33 +430,31 @@ export default function Home() {
         <p className="text-sm font-semibold text-[#37352f] flex-shrink-0">
           {r.amount != null ? `¥${r.amount.toLocaleString()}` : '—'}
         </p>
-        {!isSelectMode && (
-          <>
-            {r.image_url && (
-              <button
-                onClick={() => setPreviewUrl(r.image_url)}
-                className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-[#37352f] hover:bg-[#f1f1ef] transition-all text-sm flex-shrink-0"
-                aria-label="画像プレビュー"
-              >
-                🖼
-              </button>
-            )}
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          {r.image_url && (
             <button
-              onClick={() => startEdit(r)}
-              className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-[#37352f] hover:bg-[#f1f1ef] transition-all text-sm flex-shrink-0"
-              aria-label="編集"
+              onClick={() => setPreviewUrl(r.image_url)}
+              className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-[#37352f] hover:bg-[#f1f1ef] transition-all text-sm"
+              aria-label="画像プレビュー"
             >
-              ✎
+              🖼
             </button>
-            <button
-              onClick={() => handleDelete(r.id)}
-              className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-red-500 hover:bg-red-50 transition-all text-base flex-shrink-0"
-              aria-label="削除"
-            >
-              ×
-            </button>
-          </>
-        )}
+          )}
+          <button
+            onClick={() => startEdit(r)}
+            className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-[#37352f] hover:bg-[#f1f1ef] transition-all text-sm"
+            aria-label="編集"
+          >
+            ✎
+          </button>
+          <button
+            onClick={() => handleDelete(r.id)}
+            className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-red-500 hover:bg-red-50 transition-all text-base"
+            aria-label="削除"
+          >
+            ×
+          </button>
+        </div>
       </div>
     )
   }
@@ -445,12 +485,28 @@ export default function Home() {
     <div className="min-h-screen bg-[#f7f6f3] font-sans">
 
       {/* ナビゲーションバー */}
-      <div className="bg-white border-b border-[#e9e9e7] px-5 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2.5">
-          <span className="text-lg">🧾</span>
-          <span className="font-semibold text-[#37352f] text-sm tracking-tight">領収書管理</span>
+      <div className="bg-white border-b border-[#e9e9e7] px-5 py-3 sticky top-0 z-10">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🧾</span>
+            <span className="font-semibold text-[#37352f] text-sm tracking-tight">領収書管理</span>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="text-xs text-[#9b9a97] hover:text-[#37352f] hover:bg-[#f1f1ef] px-2 py-1.5 rounded-md transition-colors border border-[#e9e9e7]"
+          >
+            ログアウト
+          </button>
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <select
+            value={csvDateField}
+            onChange={(e) => setCsvDateField(e.target.value as 'receipt' | 'applied')}
+            className="text-xs text-[#787774] border border-[#e9e9e7] rounded-md px-2 py-1.5 bg-white focus:outline-none"
+          >
+            <option value="receipt">レシート日付</option>
+            <option value="applied">申請日</option>
+          </select>
           <input
             type="date"
             value={csvFrom}
@@ -470,12 +526,6 @@ export default function Home() {
             className="flex items-center gap-1.5 text-xs text-[#787774] hover:text-[#37352f] hover:bg-[#f1f1ef] disabled:opacity-40 px-3 py-1.5 rounded-md transition-colors border border-[#e9e9e7]"
           >
             ↓ CSV出力
-          </button>
-          <button
-            onClick={handleSignOut}
-            className="text-xs text-[#9b9a97] hover:text-[#37352f] hover:bg-[#f1f1ef] px-2 py-1.5 rounded-md transition-colors border border-[#e9e9e7]"
-          >
-            ログアウト
           </button>
         </div>
       </div>
@@ -530,54 +580,68 @@ export default function Home() {
           )}
         </div>
 
-        {/* 選択モード */}
-        <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => {
-              setIsSelectMode(!isSelectMode)
-              setSelectedIds(new Set())
-            }}
-            className={`text-xs px-3 py-1.5 rounded-md transition-colors border ${
-              isSelectMode
-                ? 'text-[#37352f] border-[#37352f] bg-[#f1f1ef]'
-                : 'text-[#9b9a97] border-[#e9e9e7] hover:text-[#37352f] hover:bg-[#f1f1ef]'
-            }`}
-          >
-            {isSelectMode ? '選択終了' : '選択'}
-          </button>
-          {isSelectMode && selectedIds.size > 0 && (
+        {/* 申請アクションバー */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 mb-3 p-3 bg-white rounded-xl border border-[#e9e9e7]">
+            <span className="text-xs text-[#9b9a97] flex-1">{selectedIds.size}件を選択中</span>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-[#9b9a97] hover:text-[#37352f] px-2 py-1.5 rounded-md hover:bg-[#f1f1ef] transition-colors"
+            >
+              クリア
+            </button>
             <button
               onClick={handleBulkDelete}
               disabled={bulkDeleting}
-              className="text-xs text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors"
+              className="text-xs text-red-500 hover:text-white hover:bg-red-500 disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors border border-red-200 hover:border-red-500"
             >
-              {bulkDeleting ? '削除中...' : `削除 (${selectedIds.size}件)`}
+              {bulkDeleting ? '削除中...' : '削除'}
             </button>
-          )}
-          {searchQuery && (
-            <p className="text-xs text-[#9b9a97]">{filteredReceipts.length} 件ヒット</p>
-          )}
-        </div>
+            <button
+              onClick={handleApply}
+              disabled={applying}
+              className="text-xs text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors font-medium"
+            >
+              {applying ? '申請中...' : '申請する'}
+            </button>
+          </div>
+        )}
 
         {/* タブ */}
         <div className="flex gap-1 mb-4 bg-[#eeede9] rounded-lg p-1">
-          {(['all', 'monthly', 'category'] as ViewMode[]).map((mode) => {
-            const labels: Record<ViewMode, string> = { all: 'すべて', monthly: '月別', category: 'カテゴリ' }
+          {(['all', 'monthly', 'category', 'applied'] as ViewMode[]).map((mode) => {
+            const labels: Record<ViewMode, string> = {
+              all: 'すべて',
+              monthly: '月別',
+              category: 'カテゴリ',
+              applied: '申請済み',
+            }
+            const isAppliedTab = mode === 'applied'
+            const appliedCount = appliedReceipts.length
             return (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`flex-1 text-xs py-1.5 rounded-md transition-colors font-medium ${
+                className={`flex-1 text-xs py-1.5 rounded-md transition-colors font-medium relative ${
                   viewMode === mode
                     ? 'bg-white text-[#37352f] shadow-sm'
                     : 'text-[#9b9a97] hover:text-[#37352f]'
                 }`}
               >
                 {labels[mode]}
+                {isAppliedTab && appliedCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                    {appliedCount > 9 ? '9+' : appliedCount}
+                  </span>
+                )}
               </button>
             )
           })}
         </div>
+
+        {searchQuery && (
+          <p className="text-xs text-[#9b9a97] mb-3">{filteredReceipts.length} 件がヒット</p>
+        )}
 
         {/* すべて */}
         {viewMode === 'all' && (
@@ -590,7 +654,6 @@ export default function Home() {
         {/* 月別 */}
         {viewMode === 'monthly' && (
           <div className="space-y-4">
-            {/* 支出推移グラフ */}
             {monthlyTotals.length > 0 && (
               <div className="bg-white rounded-xl border border-[#e9e9e7] p-4">
                 <p className="text-xs font-semibold text-[#9b9a97] uppercase tracking-widest mb-3">支出推移</p>
@@ -670,6 +733,40 @@ export default function Home() {
                 )
               })
             })()}
+          </div>
+        )}
+
+        {/* 申請済み */}
+        {viewMode === 'applied' && (
+          <div className="space-y-4">
+            {appliedReceipts.length === 0 && (
+              <div className="bg-white rounded-xl border border-[#e9e9e7]">
+                <div className="py-16 text-center">
+                  <p className="text-3xl mb-3">📋</p>
+                  <p className="text-sm text-[#9b9a97]">申請済みの領収書はありません</p>
+                  <p className="text-xs text-[#c4c3bf] mt-1">「すべて」タブでチェックして申請してください</p>
+                </div>
+              </div>
+            )}
+            {groupByAppliedDate(appliedReceipts).map(([date, items]) => {
+              const dateTotal = items.reduce((s, r) => s + (r.amount ?? 0), 0)
+              return (
+                <div key={date} className="bg-white rounded-xl border border-[#e9e9e7] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-green-50 border-b border-green-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-green-700">✓ {date} 申請分</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-green-600">{items.length}件</span>
+                      <span className="text-xs font-semibold text-green-700">¥{dateTotal.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[#e9e9e7]">
+                    {items.map((r) => renderReceiptRow(r, false))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

@@ -14,5 +14,6 @@ export type Receipt = {
   image_url: string | null
   category: string | null
   memo: string | null
+  applied_at: string | null
   created_at: string
 }
