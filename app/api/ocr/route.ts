@@ -11,25 +11,43 @@ export async function POST(request: NextRequest) {
 
   const bytes = await file.arrayBuffer()
   const base64 = Buffer.from(bytes).toString('base64')
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 
-  const visionRes = await fetch(
-    `https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_VISION_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [
-          {
+  let rawText = ''
+  if (isPdf) {
+    const visionRes = await fetch(
+      `https://vision.googleapis.com/v1/files:annotate?key=${process.env.GOOGLE_VISION_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            inputConfig: { content: base64, mimeType: 'application/pdf' },
+            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+            pages: [1],
+          }],
+        }),
+      }
+    )
+    const visionData = await visionRes.json()
+    rawText = visionData.responses?.[0]?.responses?.[0]?.fullTextAnnotation?.text ?? ''
+  } else {
+    const visionRes = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_VISION_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
             image: { content: base64 },
             features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-          },
-        ],
-      }),
-    }
-  )
-
-  const visionData = await visionRes.json()
-  const rawText: string = visionData.responses?.[0]?.fullTextAnnotation?.text ?? ''
+          }],
+        }),
+      }
+    )
+    const visionData = await visionRes.json()
+    rawText = visionData.responses?.[0]?.fullTextAnnotation?.text ?? ''
+  }
 
   const { store_name, amount, receipt_date } = extractReceiptInfo(rawText)
   const category = guessCategory(rawText)

@@ -433,11 +433,17 @@ export default function Home() {
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {r.image_url && (
             <button
-              onClick={() => setPreviewUrl(r.image_url)}
+              onClick={() => {
+                if (r.image_url!.toLowerCase().includes('.pdf')) {
+                  window.open(r.image_url!, '_blank')
+                } else {
+                  setPreviewUrl(r.image_url)
+                }
+              }}
               className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[#9b9a97] hover:text-[#37352f] hover:bg-[#f1f1ef] transition-all text-sm"
-              aria-label="画像プレビュー"
+              aria-label="ファイルプレビュー"
             >
-              🖼
+              {r.image_url.toLowerCase().includes('.pdf') ? '📄' : '🖼'}
             </button>
           )}
           <button
@@ -553,7 +559,7 @@ export default function Home() {
               </>
             )}
           </div>
-          <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={loading} />
+          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUpload} disabled={loading} />
         </label>
 
         {message && (
@@ -816,7 +822,7 @@ export default function Home() {
             </div>
 
             <div className="flex gap-4 mb-4">
-              {ocrPreview.image_url ? (
+              {ocrPreview.image_url && !ocrPreview.image_url.toLowerCase().includes('.pdf') ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={ocrPreview.image_url}
@@ -825,7 +831,7 @@ export default function Home() {
                 />
               ) : (
                 <div className="w-20 h-20 bg-[#f1f1ef] rounded-lg flex items-center justify-center flex-shrink-0">
-                  <span className="text-2xl">🧾</span>
+                  <span className="text-2xl">{ocrPreview.image_url ? '📄' : '🧾'}</span>
                 </div>
               )}
               <div className="flex-1 space-y-2">
